@@ -100,20 +100,19 @@ if 'pieces_input' not in st.session_state:
 def clear_pieces_input():
     st.session_state.pieces_input = ""
 
-# NAUJAS: Išdėstymas su išvalymo mygtuku
-col_text, col_button = st.columns([3, 1])
-with col_text:
-    raw_input = st.text_area(
-        "Vienoje eilutėje – vienas ruošinys (pvz. 1200 800 5):",
-        value=st.session_state.pieces_input,
-        height=200,
-        placeholder="Įveskite ruošinius, pvz., 1200 800 5\n504 769\n1030 290",
-        key="pieces_input"
-    )
-with col_button:
-    st.markdown('<div class="clear-button">', unsafe_allow_html=True)
-    st.button("Išvalyti duomenis", on_click=clear_pieces_input)
-    st.markdown('</div>', unsafe_allow_html=True)
+# NAUJAS: „Išvalyti duomenis“ mygtukas virš text_area
+st.markdown('<div class="clear-button">', unsafe_allow_html=True)
+st.button("Išvalyti duomenis", on_click=clear_pieces_input)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# NAUJAS: Ruošinių įvedimo laukas
+raw_input = st.text_area(
+    "Vienoje eilutėje – vienas ruošinys (pvz. 1200 800 5):",
+    value=st.session_state.pieces_input,
+    height=200,
+    placeholder="Įveskite ruošinius, pvz., 1200 800 5\n504 769\n1030 290",
+    key="pieces_input"
+)
 
 # ======================
 # 🔍 PARSINGAS
@@ -157,7 +156,7 @@ class OptimalPacker:
         layouts[(1200, 800)] = [
             (0, 0, 800, 1200, True),
             (800, 0, 800, 1200, True),
-            (1600,  0, 800, 1200, True),
+            (1600, 0, 800, 1200, True),
             (0, 1200, 1200, 800, False),
             (1200, 1200, 1200, 800, False)
         ]
