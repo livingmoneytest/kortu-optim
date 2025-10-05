@@ -4,9 +4,6 @@ import matplotlib.patches as patches
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Image, Spacer
-from reportlab.lib.pagesizes import landscape, A4
-import tempfile
 import io
 import math
 from collections import Counter
@@ -102,7 +99,7 @@ def parse_pieces(text):
 pieces = parse_pieces(raw_input)
 
 # ======================
-# 🧠 OPTIMIZATORIAUS LOGIKA (TAVO VERSIJA)
+# 🧠 OPTIMIZATORIAUS LOGIKA
 # ======================
 class OptimalPacker:
     def __init__(self, board_width, board_height):
@@ -256,9 +253,8 @@ class OptimalPacker:
         total_area = self.board_width * self.board_height
         return (used_area / total_area) * 100
 
-
 # ======================
-# 🎨 BRAIŽYMAS
+# 🎨 BRAIŽYMAS SU TEISINGA ORIENTACIJA
 # ======================
 def draw_optimal_board(board_data, width, height, title):
     fig, ax = plt.subplots(figsize=(10, 7))
@@ -276,53 +272,122 @@ def draw_optimal_board(board_data, width, height, title):
         ax.add_patch(rect)
         ax.text(x + w / 2, y + h / 2, f"{w}×{h}", ha='center', va='center', fontsize=8, fontweight='bold')
 
-    ax.invert_yaxis()
+    # NEbeklausime ašies - paliekame normalią orientaciją
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     return fig
 
-
 # ======================
-# 🧾 PDF GENERAVIMAS
+# 🧾 PDF GENERAVIMAS SU SPALVOMIS
 # ======================
-
-
 def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas):
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=landscape(A4))
-
-    scale = min((A4[0] - 80 * mm) / width, (A4[1] - 80 * mm) / height)
-
+    
+    # Skalės skaičiavimas
+    scale = min((A4[0] - 100 * mm) / width, (A4[1] - 100 * mm) / height)
+    
+    # Spalvų paletė atitinkanti matplotlib spalvas
+    colors = [
+        (1.0, 0.42, 0.42),  # #FF6B6B
+        (0.30, 0.80, 0.77),  # #4ECDC4
+        (0.27, 0.72, 0.82),  # #45B7D1
+        (0.59, 0.81, 0.71),  # #96CEB4
+        (1.0, 0.92, 0.65),  # #FFEAA7
+        (0.87, 0.63, 0.87),  # #DDA0DD
+        (0.53, 0.81, 0.92)   # #87CEEB
+    ]
+    
     for i, board_data in enumerate(boards, 1):
         pieces = board_data['pieces']
         efficiency = board_data['efficiency']
-
+        
+        # Antraštė
         c.setFont("Helvetica-Bold", 16)
-        c.drawString(40 * mm, A4[1] - 30 * mm, f"{uzsakymo_nr} -- Korta {i}")
+        c.drawString(50 * mm, A4[1] - 40 * mm, f"{uzsakymo_nr} – Korta {i} ({plokstes_tipas})")
         c.setFont("Helvetica", 10)
-        c.drawString(40 * mm, A4[1] - 45 * mm, f"Tipas: {board_data['type']} | Išeiga: {efficiency:.1f}%")
-
-        for (x, y, w, h, rotated) in pieces:
-            sx = 40 * mm + x * scale
-            sy = 40 * mm + y * scale
+        c.drawString(50 * mm, A4[1] - 55 * mm, f"Išeiga: {efficiency:.1f}% | Ruošiniai: {len(pieces)}")
+        
+        # Piešiami ruošiniai su spalvomis
+        for j, (x, y, w, h, rotated) in enumerate(pieces):
+            color = colors[j % len(colors)]
+            
+            # Koordinatės PDF (teisinga orientacija)
+            sx = 50 * mm + x * scale
+            sy = 50 * mm + y * scale
             sw = w * scale
             sh = h * scale
-
-            c.rect(sx, sy, sw, sh)
+            
+            # Stačiakampis su spalva
+            c.setFillColorRGB(*color)
+            c.setStrokeColorRGB(0.17, 0.24, 0.31)  # tamsiai mėlyna
+            c.setLineWidth(1)
+            c.rect(sx, sy, sw, sh, fill=1)
+            
+            # Tekstas
+            c.setFillColorRGB(0, 0, 0)  # juoda spalva tekstui
             c.setFont("Helvetica-Bold", 6)
-            c.drawCentredString(sx + sw / 2, sy + sh / 2, f"{w}×{h}")
-
+            text = f"{w}×{h}"
             if rotated:
-                c.setFont("Helvetica", 5)
-                c.drawString(sx + 1 * mm, sy + 1 * mm, "R")
-
+                text += " R"
+            c.drawCentredString(sx + sw / 2, sy + sh / 2, text)
+        
+        # Kortos rėmelis
+        c.setFillColorRGB(0, 0, 0, 0)  # permatomas
+        c.setStrokeColorRGB(0, 0, 0)   # juoda
+        c.setLineWidth(2)
+        c.rect(50 * mm, 50 * mm, width * scale, height * scale)
+        
+        # Matmenų užrašai
+        c.setFont("Helvetica", 8)
+        c.drawString(50 * mm, 45 * mm, f"{width} mm")
+        c.drawString(45 * mm, 50 * mm + height * scale / 2, f"{height} mm")
+        
         c.showPage()
-
+    
     c.save()
     buf.seek(0)
     return buf
 
-
+# ======================
+# 🖼️ VAIZDO GENERAVIMAS PDF
+# ======================
+def generate_pdf_with_images(boards, width, height, uzsakymo_nr, plokstes_tipas):
+    """Alternatyvus PDF generavimas naudojant matplotlib paveikslėlius"""
+    buf = io.BytesIO()
+    
+    for i, board_data in enumerate(boards, 1):
+        # Sukuriame paveikslėlį
+        fig = draw_optimal_board(board_data, width, height, f"Korta {i}")
+        
+        # Išsaugome į laikiną bufferį
+        img_buf = io.BytesIO()
+        plt.savefig(img_buf, format='png', dpi=150, bbox_inches='tight')
+        img_buf.seek(0)
+        
+        # Sukuriame PDF puslapį
+        if i == 1:
+            c = canvas.Canvas(buf, pagesize=landscape(A4))
+        else:
+            c = canvas.Canvas(buf, pagesize=landscape(A4))
+        
+        # Antraštė
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50 * mm, A4[1] - 30 * mm, f"{uzsakymo_nr} – Korta {i} ({plokstes_tipas})")
+        c.setFont("Helvetica", 10)
+        c.drawString(50 * mm, A4[1] - 45 * mm, f"Išeiga: {board_data['efficiency']:.1f}%")
+        
+        # Įdedame paveikslėlį
+        from reportlab.lib.utils import ImageReader
+        img = ImageReader(img_buf)
+        c.drawImage(img, 50 * mm, 50 * mm, width=A4[0]-100*mm, height=A4[1]-100*mm, preserveAspectRatio=True)
+        
+        c.showPage()
+        plt.close(fig)
+    
+    c.save()
+    buf.seek(0)
+    return buf
 
 # ======================
 # 🚀 PAGRINDINĖ LOGIKA
@@ -342,6 +407,7 @@ if st.button("🚀 GENERUOTI OPTIMALŲ IŠDĖSTYMĄ"):
         total_area = kortos_ilgis * kortos_plotis * len(boards)
         overall_efficiency = total_used_area / total_area * 100
 
+        # Rodyti vizualizacijas
         for i, board_data in enumerate(boards, 1):
             st.write(f"### 📄 Korta {i} ({board_data['type']}) – {board_data['efficiency']:.1f}%")
             fig = draw_optimal_board(board_data, kortos_ilgis, kortos_plotis, f"Korta {i}")
@@ -349,8 +415,21 @@ if st.button("🚀 GENERUOTI OPTIMALŲ IŠDĖSTYMĄ"):
             plt.close(fig)
 
         st.success(f"🎉 **Baigta! Bendra išeiga: {overall_efficiency:.1f}%**")
-        pdf_buf = generate_optimal_pdf(boards, kortos_ilgis, kortos_plotis, uzsakymo_nr, plokstes_tipas)
-        st.download_button("📥 Atsisiųsti PDF", pdf_buf, f"{uzsakymo_nr}_planas.pdf", "application/pdf")
+        
+        # PDF atsisiuntimas
+        pdf_method = st.radio("PDF metodas:", ["Spalvotas PDF", "Paveikslėlių PDF"], horizontal=True)
+        
+        if pdf_method == "Spalvotas PDF":
+            pdf_buf = generate_optimal_pdf(boards, kortos_ilgis, kortos_plotis, uzsakymo_nr, plokstes_tipas)
+        else:
+            pdf_buf = generate_pdf_with_images(boards, kortos_ilgis, kortos_plotis, uzsakymo_nr, plokstes_tipas)
+            
+        st.download_button(
+            "📥 Atsisiųsti PDF", 
+            pdf_buf, 
+            f"{uzsakymo_nr}_planas.pdf", 
+            "application/pdf"
+        )
 
 # ======================
 # ℹ️ ŠONINĖ INFO
@@ -358,5 +437,6 @@ if st.button("🚀 GENERUOTI OPTIMALŲ IŠDĖSTYMĄ"):
 st.sidebar.header("📊 Statistika")
 if pieces:
     piece_counts = Counter(pieces)
+    st.sidebar.write(f"**Viso ruošinių:** {len(pieces)}")
     for (w, h), count in piece_counts.items():
         st.sidebar.write(f"{w}×{h}: {count} vnt.")
