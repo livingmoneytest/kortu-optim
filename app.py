@@ -33,6 +33,10 @@ st.markdown("""
         font-size: 20px !important;
         text-align: center;
     }
+    .stNumberInput > div > div > input {
+        font-size: 20px !important;
+        text-align: center;
+    }
     .clear-button > button {
         width: 100%;
         height: 40px;
@@ -89,23 +93,37 @@ except:
     st.error("❌ Įvesk formatu: 2800x2070 arba 2800 2070")
     st.stop()
 
+# NAUJAS: Pjūvio storio pasirinkimas
+st.write("### Pjūvio storis:")
+saw_thickness_option = st.radio(
+    "Pasirink pjūvio storį:",
+    ["4.8 mm (naujas pjūklas)", "4.6 mm (galąstas pjūklas)", "4.4 mm (susidėvėjęs pjūklas)", "Kitas"],
+    horizontal=True,
+    index=0
+)
+
+if saw_thickness_option == "Kitas":
+    saw_thickness = st.number_input("Įveskite pjūvio storį (mm):", min_value=0.0, value=4.8, step=0.1)
+else:
+    saw_thickness = float(saw_thickness_option.split(" ")[0])
+
 st.write("### Įvesk ruošinius:")
 st.markdown("**Pastaba**: Vietoje 'x' galite naudoti tarpą, pvz., `1200 800 5` arba `1200x800x5`")
 
-# NAUJAS: Sesijos būsena ruošinių laukui
+# Sesijos būsena ruošinių laukui
 if 'pieces_input' not in st.session_state:
     st.session_state.pieces_input = ""
 
-# NAUJAS: Funkcija, išvalanti ruošinių lauką
+# Funkcija, išvalanti ruošinių lauką
 def clear_pieces_input():
     st.session_state.pieces_input = ""
 
-# NAUJAS: „Išvalyti duomenis“ mygtukas virš text_area
+# „Išvalyti duomenis“ mygtukas virš text_area
 st.markdown('<div class="clear-button">', unsafe_allow_html=True)
 st.button("Išvalyti duomenis", on_click=clear_pieces_input)
 st.markdown('</div>', unsafe_allow_html=True)
 
-# NAUJAS: Ruošinių įvedimo laukas
+# Ruošinių įvedimo laukas
 raw_input = st.text_area(
     "Vienoje eilutėje – vienas ruošinys (pvz. 1200 800 5):",
     value=st.session_state.pieces_input,
@@ -145,28 +163,31 @@ pieces = parse_pieces(raw_input)
 # 🧠 OPTIMIZATORIAUS LOGIKA
 # ======================
 class OptimalPacker:
-    def __init__(self, board_width, board_height):
+    def __init__(self, board_width, board_height, saw_thickness):
         self.board_width = board_width
         self.board_height = board_height
+        self.saw_thickness = saw_thickness
         self.optimal_layouts = self._initialize_optimal_layouts()
 
     def _initialize_optimal_layouts(self):
         layouts = {}
+        # NAUJAS: Pridedame pjūvio storį prie optimalių layout'ų
+        st = self.saw_thickness
         # 1200×800 optimalus layoutas
         layouts[(1200, 800)] = [
-            (0, 0, 800, 1200, True),
-            (800, 0, 800, 1200, True),
-            (1600, 0, 800, 1200, True),
-            (0, 1200, 1200, 800, False),
-            (1200, 1200, 1200, 800, False)
+            (0, 0, 800 + st, 1200 + st, True),
+            (800 + st, 0, 800 + st, 1200 + st, True),
+            (1600 + 2 * st, 0, 800 + st, 1200 + st, True),
+            (0, 1200 + st, 1200 + st, 800 + st, False),
+            (1200 + st, 1200 + st, 1200 + st, 800 + st, False)
         ]
         # 800×1200 optimalus layoutas
         layouts[(800, 1200)] = [
-            (0, 0, 1200, 800, True),
-            (1200, 0, 1200, 800, True),
-            (0, 800, 800, 1200, False),
-            (800, 800, 800, 1200, False),
-            (1600, 800, 800, 1200, False)
+            (0, 0, 1200 + st, 800 + st, True),
+            (1200 + st, 0, 1200 + st, 800 + st, True),
+            (0, 800 + st, 800 + st, 1200 + st, False),
+            (800 + st, 800 + st, 800 + st, 1200 + st, False),
+            (1600 + 2 * st, 800 + st, 800 + st, 1200 + st, False)
         ]
         return layouts
 
@@ -241,7 +262,9 @@ class OptimalPacker:
             else:
                 if remaining_pieces:
                     first_piece = remaining_pieces[0]
-                    board_pieces = [(0, 0, first_piece[0], first_piece[1], False)]
+                    # NAUJAS: Pridedame pjūvio storį prie pirmo ruošinio
+                    w, h = first_piece[0] + self.saw_thickness, first_piece[1] + self.saw_thickness
+                    board_pieces = [(0, 0, w, h, False)]
                     boards.append({
                         'pieces': board_pieces,
                         'free_rects': self._calculate_free_rectangles(board_pieces),
@@ -253,6 +276,9 @@ class OptimalPacker:
 
     def _find_free_position_for_standard(self, piece, occupied_positions, existing_pieces):
         w, h = piece
+        # NAUJAS: Pridedame pjūvio storį prie ruošinio matmenų
+        w += self.saw_thickness
+        h += self.saw_thickness
         for orientation in [False, True]:
             if orientation:
                 piece_width, piece_height = h, w
@@ -260,8 +286,8 @@ class OptimalPacker:
                 piece_width, piece_height = w, h
             candidate_positions = [(0, 0)]
             for existing_x, existing_y, existing_w, existing_h, _ in existing_pieces:
-                candidate_positions.append((existing_x + existing_w, existing_y))
-                candidate_positions.append((existing_x, existing_y + existing_h))
+                candidate_positions.append((existing_x + existing_w + self.saw_thickness, existing_y))
+                candidate_positions.append((existing_x, existing_y + existing_h + self.saw_thickness))
             for x, y in candidate_positions:
                 if x + piece_width <= self.board_width and y + piece_height <= self.board_height:
                     if not self._check_collision(x, y, piece_width, piece_height, occupied_positions):
@@ -283,34 +309,39 @@ class OptimalPacker:
         for x, y, w, h, _ in layout:
             max_height = max(max_height, y + h)
         if max_height < self.board_height:
-            return [(0, max_height, self.board_width, self.board_height - max_height)]
+            return [(0, max_height + self.saw_thickness, self.board_width, self.board_height - max_height - self.saw_thickness)]
         return []
 
     def _calculate_efficiency(self, layout):
         if not layout:
             return 0
-        used_area = sum(w * h for _, _, w, h, _ in layout)
+        # NAUJAS: Apskaičiuojame efektyvumą, atsižvelgdami į pjūvio storį
+        used_area = sum((w - self.saw_thickness) * (h - self.saw_thickness) for _, _, w, h, _ in layout)
         total_area = self.board_width * self.board_height
         return (used_area / total_area) * 100
 
 # ======================
 # 🎨 BRAIŽYMAS
 # ======================
-def draw_optimal_board(board_data, width, height, title):
+def draw_optimal_board(board_data, width, height, title, saw_thickness):
     fig, ax = plt.subplots(figsize=(10, 7))
     ax.set_xlim(0, width)
     ax.set_ylim(0, height)
     ax.set_aspect('equal')
-    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_title(f"{title} (Pjūvio storis: {saw_thickness} mm)", fontsize=14, fontweight='bold')
 
     pieces = board_data['pieces']
     colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#87CEEB']
 
     for i, (x, y, w, h, rotated) in enumerate(pieces):
         color = colors[i % len(colors)]
+        # NAUJAS: Ruošiniai vizualizuojami su pjūvio storiu
         rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='darkblue', facecolor=color, alpha=0.8)
         ax.add_patch(rect)
-        text = f"{w}×{h}{' R' if rotated else ''}"
+        # NAUJAS: Rodyti originalius matmenis (be pjūvio storio)
+        original_w = w - saw_thickness if rotated else w - saw_thickness
+        original_h = h - saw_thickness if rotated else h - saw_thickness
+        text = f"{int(original_w)}×{int(original_h)}{' R' if rotated else ''}"
         ax.text(x + w / 2, y + h / 2, text, ha='center', va='center', fontsize=8, fontweight='bold')
 
     ax.grid(True, alpha=0.3)
@@ -320,7 +351,7 @@ def draw_optimal_board(board_data, width, height, title):
 # ======================
 # 🧾 PDF GENERAVIMAS SU SPALVOMIS
 # ======================
-def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas):
+def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas, saw_thickness):
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=landscape(A4))
     
@@ -343,7 +374,7 @@ def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas):
         c.setFont("Helvetica-Bold", 16)
         c.drawString(50 * mm, A4[1] - 40 * mm, f"{uzsakymo_nr} – Korta {i} ({plokstes_tipas})")
         c.setFont("Helvetica", 10)
-        c.drawString(50 * mm, A4[1] - 55 * mm, f"Išeiga: {efficiency:.1f}% | Ruošiniai: {len(pieces)}")
+        c.drawString(50 * mm, A4[1] - 55 * mm, f"Išeiga: {efficiency:.1f}% | Ruošiniai: {len(pieces)} | Pjūvio storis: {saw_thickness} mm")
         
         for j, (x, y, w, h, rotated) in enumerate(pieces):
             color = colors[j % len(colors)]
@@ -359,7 +390,10 @@ def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas):
             
             c.setFillColorRGB(0, 0, 0)
             c.setFont("Helvetica-Bold", 6)
-            text = f"{w}×{h}{' R' if rotated else ''}"
+            # NAUJAS: Rodyti originalius matmenis (be pjūvio storio)
+            original_w = w - saw_thickness if rotated else w - saw_thickness
+            original_h = h - saw_thickness if rotated else h - saw_thickness
+            text = f"{int(original_w)}×{int(original_h)}{' R' if rotated else ''}"
             c.drawCentredString(sx + sw / 2, sy + sh / 2, text)
         
         c.setFillColorRGB(0, 0, 0, 0)
@@ -385,24 +419,27 @@ if st.button("🚀 GENERUOTI OPTIMALŲ IŠDĖSTYMĄ"):
         st.warning("Įvesk bent vieną ruošinį.")
     else:
         with st.spinner("Kuriamas optimalus ruošinių išdėstymas..."):
-            packer = OptimalPacker(kortos_ilgis, kortos_plotis)
+            # NAUJAS: Perduodame pjūvio storį į OptimalPacker
+            packer = OptimalPacker(kortos_ilgis, kortos_plotis, saw_thickness)
             boards = packer.pack_all_pieces(pieces)
 
         st.subheader("📊 OPTIMALUS RUOŠINIŲ IŠDĖSTYMAS")
 
         total_pieces = sum(len(b['pieces']) for b in boards)
-        total_used_area = sum(sum(w * h for _, _, w, h, _ in b['pieces']) for b in boards)
+        total_used_area = sum(sum((w - saw_thickness) * (h - saw_thickness) for _, _, w, h, _ in b['pieces']) for b in boards)
         total_area = kortos_ilgis * kortos_plotis * len(boards)
         overall_efficiency = total_used_area / total_area * 100
 
         for i, board_data in enumerate(boards, 1):
             st.write(f"### 📄 Korta {i} ({board_data['type']}) – {board_data['efficiency']:.1f}%")
-            fig = draw_optimal_board(board_data, kortos_ilgis, kortos_plotis, f"Korta {i}")
+            # NAUJAS: Perduodame pjūvio storį į draw_optimal_board
+            fig = draw_optimal_board(board_data, kortos_ilgis, kortos_plotis, f"Korta {i}", saw_thickness)
             st.pyplot(fig)
             plt.close(fig)
 
         st.success(f"🎉 **Baigta! Bendra išeiga: {overall_efficiency:.1f}%**")
-        pdf_buf = generate_optimal_pdf(boards, kortos_ilgis, kortos_plotis, uzsakymo_nr, plokstes_tipas)
+        # NAUJAS: Perduodame pjūvio storį į generate_optimal_pdf
+        pdf_buf = generate_optimal_pdf(boards, kortos_ilgis, kortos_plotis, uzsakymo_nr, plokstes_tipas, saw_thickness)
         st.download_button(
             "📥 Atsisiųsti PDF",
             pdf_buf,
@@ -417,5 +454,6 @@ st.sidebar.header("📊 Statistika")
 if pieces:
     piece_counts = Counter(pieces)
     st.sidebar.write(f"**Viso ruošinių:** {len(pieces)}")
+    st.sidebar.write(f"**Pjūvio storis:** {saw_thickness} mm")
     for (w, h), count in piece_counts.items():
         st.sidebar.write(f"{w}×{h}: {count} vnt.")
