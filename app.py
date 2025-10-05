@@ -31,8 +31,8 @@ st.markdown("""
         font-size: 18px !important;
     }
     .number-btn {
-        height: 50px !important;
-        font-size: 18px !important;
+        height: 60px !important;
+        font-size: 20px !important;
         margin: 2px !important;
     }
 </style>
@@ -53,80 +53,140 @@ with col1:
 with col2:
     plokstes_tipas = st.selectbox("Plokštės tipas:", ["MDF", "HDF", "LDF", "MDP", "PPD", "KITA"])
 
-# Fiksuotas plokštės dydis
-kortos_ilgis, kortos_plotis = 2800, 2070
-st.info(f"📐 Plokštės dydis: {kortos_ilgis} × {kortos_plotis} mm")
+# Plokštės dydžio pasirinkimas
+st.write("### Plokštės dydis:")
+kortos_variantas = st.radio(
+    "Pasirinkite plokštės dydį:",
+    ["2800x2070 (standartinė)", "3050x1830 (didelė)", "Kitas dydis"],
+    horizontal=True
+)
+
+if kortos_variantas == "Kitas dydis":
+    custom_size = st.text_input("Įveskite plokštės matmenis (plotis x aukštis):", "2800x2070")
+    try:
+        kortos_ilgis, kortos_plotis = [int(x) for x in custom_size.lower().split("x")]
+    except:
+        st.error("❌ Neteisingas formatas! Naudokite: 2800x2070")
+        st.stop()
+else:
+    kortos_matmenys = kortos_variantas.split(" ")[0]
+    kortos_ilgis, kortos_plotis = [int(x) for x in kortos_matmenys.split("x")]
+
+st.info(f"📐 Pasirinktas plokštės dydis: {kortos_ilgis} × {kortos_plotis} mm")
+
+# Inicializuojame sesijos kintamuosius
+if 'pieces_list' not in st.session_state:
+    st.session_state.pieces_list = []
+if 'current_input' not in st.session_state:
+    st.session_state.current_input = ""
 
 # Ruošinių įvedimas
 st.write("### Įveskite ruošinius:")
 
 # Dabartinė įvestis
-current_input = st.text_input("Įveskite matmenis (plotis aukštis kiekis):", 
-                             placeholder="pvz: 1200 800 5 arba 1200 800",
-                             key="piece_input")
+current_input = st.text_input(
+    "Įveskite matmenis (plotis aukštis kiekis):", 
+    value=st.session_state.current_input,
+    placeholder="pvz: 1200 800 5 arba 1200 800",
+    key="main_input"
+)
 
-# Mobili skaičių klaviatūra
+# Mobili skaičių klaviatūra - viena eilutė
 st.write("**Skaičių klaviatūra:**")
-col1, col2, col3, col4 = st.columns(4)
+
+# Pirmoji eilutė: 1 2 3 4 5
+col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     if st.button("1", use_container_width=True, key="btn1"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "1"
-    if st.button("4", use_container_width=True, key="btn4"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "4"
-    if st.button("7", use_container_width=True, key="btn7"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "7"
+        st.session_state.current_input += "1"
+        st.rerun()
 with col2:
     if st.button("2", use_container_width=True, key="btn2"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "2"
-    if st.button("5", use_container_width=True, key="btn5"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "5"
-    if st.button("8", use_container_width=True, key="btn8"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "8"
+        st.session_state.current_input += "2"
+        st.rerun()
 with col3:
     if st.button("3", use_container_width=True, key="btn3"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "3"
-    if st.button("6", use_container_width=True, key="btn6"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "6"
-    if st.button("9", use_container_width=True, key="btn9"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "9"
+        st.session_state.current_input += "3"
+        st.rerun()
 with col4:
+    if st.button("4", use_container_width=True, key="btn4"):
+        st.session_state.current_input += "4"
+        st.rerun()
+with col5:
+    if st.button("5", use_container_width=True, key="btn5"):
+        st.session_state.current_input += "5"
+        st.rerun()
+
+# Antroji eilutė: 6 7 8 9 0
+col1, col2, col3, col4, col5 = st.columns(5)
+with col1:
+    if st.button("6", use_container_width=True, key="btn6"):
+        st.session_state.current_input += "6"
+        st.rerun()
+with col2:
+    if st.button("7", use_container_width=True, key="btn7"):
+        st.session_state.current_input += "7"
+        st.rerun()
+with col3:
+    if st.button("8", use_container_width=True, key="btn8"):
+        st.session_state.current_input += "8"
+        st.rerun()
+with col4:
+    if st.button("9", use_container_width=True, key="btn9"):
+        st.session_state.current_input += "9"
+        st.rerun()
+with col5:
     if st.button("0", use_container_width=True, key="btn0"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "0"
-    if st.button("Tarpas", use_container_width=True, key="btn_space"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + " "
-    if st.button("Valyti", use_container_width=True, key="btn_clear"):
-        st.session_state.piece_input = ""
+        st.session_state.current_input += "0"
+        st.rerun()
 
-# Ruošinių valdymas
-if 'pieces_list' not in st.session_state:
-    st.session_state.pieces_list = []
-
+# Trečioji eilutė: Tarpas ir Valymas
 col1, col2 = st.columns(2)
 with col1:
-    if st.button("➕ Pridėti ruošinį", use_container_width=True):
-        if current_input.strip():
-            try:
-                # Apdorojame įvestį su tarpais
-                parts = current_input.strip().split()
-                if len(parts) == 2:
-                    w, h = int(parts[0]), int(parts[1])
-                    qty = 1
-                elif len(parts) == 3:
-                    w, h, qty = int(parts[0]), int(parts[1]), int(parts[2])
-                else:
-                    st.error("Neteisingas formatas! Naudokite: plotis aukštis kiekis")
-                # Pridedame į sąrašą
-                for _ in range(qty):
-                    st.session_state.pieces_list.append((w, h))
-                st.session_state.piece_input = ""
-                st.rerun()
-            except ValueError:
-                st.error("Klaida: Įveskite skaičius!")
-with col2:
-    if st.button("🗑️ Išvalyti viską", use_container_width=True):
-        st.session_state.pieces_list = []
-        st.session_state.piece_input = ""
+    if st.button("Tarpas", use_container_width=True, key="btn_space"):
+        st.session_state.current_input += " "
         st.rerun()
+with col2:
+    if st.button("← Valyti", use_container_width=True, key="btn_clear"):
+        st.session_state.current_input = ""
+        st.rerun()
+
+# Ruošinių valdymo mygtukai
+col1, col2 = st.columns(2)
+with col1:
+    add_piece = st.button("➕ Pridėti ruošinį", use_container_width=True)
+with col2:
+    clear_all = st.button("🗑️ Išvalyti viską", use_container_width=True)
+
+# Pridėti ruošinį
+if add_piece:
+    if st.session_state.current_input.strip():
+        try:
+            # Apdorojame įvestį su tarpais
+            parts = st.session_state.current_input.strip().split()
+            if len(parts) == 2:
+                w, h = int(parts[0]), int(parts[1])
+                qty = 1
+            elif len(parts) == 3:
+                w, h, qty = int(parts[0]), int(parts[1]), int(parts[2])
+            else:
+                st.error("Neteisingas formatas! Naudokite: plotis aukštis kiekis")
+                st.stop()
+            
+            # Pridedame į sąrašą
+            for _ in range(qty):
+                st.session_state.pieces_list.append((w, h))
+            st.session_state.current_input = ""
+            st.rerun()
+        except ValueError:
+            st.error("Klaida: Įveskite skaičius!")
+            st.rerun()
+
+# Išvalyti viską
+if clear_all:
+    st.session_state.pieces_list = []
+    st.session_state.current_input = ""
+    st.rerun()
 
 # Rodyti esamus ruošinius
 if st.session_state.pieces_list:
@@ -135,29 +195,8 @@ if st.session_state.pieces_list:
     for (w, h), count in piece_counts.items():
         st.write(f"- {w} × {h} mm: {count} vnt.")
     st.write(f"**Iš viso:** {len(st.session_state.pieces_list)} ruošiniai")
-
-# ======================
-# 🔍 PARSINGAS (išlaikau tavo originalų)
-# ======================
-def parse_pieces(text):
-    pieces = []
-    for line in text.strip().splitlines():
-        if "x" not in line:
-            continue
-        parts = line.strip().split("x")
-        try:
-            if len(parts) == 3:
-                w, h, qty = map(int, parts)
-            elif len(parts) == 2:
-                w, h = map(int, parts)
-                qty = 1
-            else:
-                continue
-            for _ in range(qty):
-                pieces.append((w, h))
-        except:
-            st.warning(f"Klaida eilutėje: {line}")
-    return pieces
+else:
+    st.info("📝 Ruošinių sąrašas tuščias. Pridėkite ruošinių naudodami skaičių klaviatūrą.")
 
 # ======================
 # 🧠 OPTIMIZATORIAUS LOGIKA (TAVO ORIGINALI VERSIJA)
@@ -406,9 +445,10 @@ if st.session_state.pieces_list:
 st.sidebar.header("ℹ️ Naudojimo instrukcija")
 st.sidebar.write("""
 1. **Pasirinkite plokštės tipą**
-2. **Įveskite ruošinius** naudodami skaičių klaviatūrą
-3. **Paspauskite** "Pridėti ruošinį"
-4. **Generuokite** optimalų išdėstymą
+2. **Pasirinkite plokštės dydį**
+3. **Įveskite ruošinius** naudodami skaičių klaviatūrą
+4. **Paspauskite** "Pridėti ruošinį"
+5. **Generuokite** optimalų išdėstymą
 
 **Formatai:**
 - 1200 800 5 (5 ruošiniai)
