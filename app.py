@@ -5,7 +5,6 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import mm
 import io
-import math
 from collections import Counter
 
 # ======================
@@ -19,18 +18,32 @@ st.markdown("""
         font-size: 20px !important;
         text-align: center;
     }
+    .stSelectbox > div > div > select {
+        font-size: 20px !important;
+        text-align: center;
+    }
     .stButton > button {
         width: 100%;
-        height: 50px;
-        font-size: 18px;
+        height: 60px;
+        font-size: 22px;
+        background-color: #2b8a3e;
+        color: white;
         border-radius: 10px;
     }
-    .number-btn {
-        height: 50px !important;
+    .stTextArea textarea {
         font-size: 18px !important;
+        height: 150px !important;
     }
-    .main > div {
-        padding: 0.5rem;
+    .number-button {
+        width: 80px;
+        height: 80px;
+        font-size: 24px;
+        margin: 5px;
+        background-color: #f0f2f6;
+        border-radius: 10px;
+    }
+    .number-button:hover {
+        background-color: #d0d2d6;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -38,7 +51,7 @@ st.markdown("""
 # ======================
 # 🪚 PAGRINDINĖ ANTRAŠTĖ
 # ======================
-st.title("🪚 Optimalus kortų optimizatorius")
+st.title("🪚 Optimalus kortų optimizatorius (mobilus)")
 st.write("Automatinis ruošinių išdėstymas pagal optimalius layout'us")
 
 # ======================
@@ -46,141 +59,102 @@ st.write("Automatinis ruošinių išdėstymas pagal optimalius layout'us")
 # ======================
 col1, col2 = st.columns(2)
 with col1:
-    uzsakymo_nr = st.text_input("Užsakymo numeris:", "UZS001")
+    uzsakymo_nr = st.text_input("Užsakymo numeris:", value="UZS001", key="order_number")
 with col2:
-    plokstes_tipas = st.selectbox("Plokštės tipas:", ["MDF", "HDF", "LDF", "MDP", "PPD", "KITA"])
+    plokstes_tipas = st.selectbox(
+        "Plokštės tipas:",
+        ["MDF", "LDF", "HDF", "PPD", "Fanera", "OSB", "Kita"],
+        index=0,
+        key="board_type"
+    )
 
-# Plokštės dydžio pasirinkimas
-st.write("### Plokštės dydis:")
+st.write("### Greiti plokštės šablonai:")
 kortos_variantas = st.radio(
-    "Pasirinkite plokštės dydį:",
-    ["2800x2070 (standartinė)", "3050x1830 (didelė)", "Kitas dydis"],
-    horizontal=True
+    "Pasirink kortos dydį:",
+    ["2800x2070 (standartinė)", "3050x1830 (didelė)", "custom"],
+    index=0,
+    horizontal=True,
+    key="board_size_choice"
 )
 
-if kortos_variantas == "Kitas dydis":
-    custom_size = st.text_input("Įveskite plokštės matmenis (plotis x aukštis):", "2800x2070")
-    try:
-        kortos_ilgis, kortos_plotis = [int(x) for x in custom_size.lower().split("x")]
-    except:
-        st.error("❌ Neteisingas formatas! Naudokite: 2800x2070")
-        st.stop()
+if kortos_variantas == "custom":
+    kortos_matmenys = st.text_input("Įvesk kortos matmenis:", value="2800x2070", key="custom_board_size")
 else:
     kortos_matmenys = kortos_variantas.split(" ")[0]
-    kortos_ilgis, kortos_plotis = [int(x) for x in kortos_matmenys.split("x")]
 
-st.info(f"📐 Pasirinktas plokštės dydis: {kortos_ilgis} × {kortos_plotis} mm")
+try:
+    kortos_ilgis, kortos_plotis = [int(x) for x in kortos_matmenys.lower().split("x")]
+except:
+    st.error("❌ Įvesk formatu: 2800x2070")
+    st.stop()
 
-# Inicializuojame sesijos kintamuosius
-if 'pieces_list' not in st.session_state:
-    st.session_state.pieces_list = []
+st.write("### Įvesk ruošinius:")
+st.write("Formatas: plotis aukštis [kiekis] (pvz., 1200 800 5 arba 1200x800x5)")
 
-# Ruošinių įvedimas
-st.write("### Įveskite ruošinius:")
+# Tuščias ruošinių įvesties laukas
+if "pieces_input" not in st.session_state:
+    st.session_state.pieces_input = ""
 
-# Įvesties laukas
-current_input = st.text_input(
-    "Įveskite matmenis (plotis aukštis kiekis):", 
-    placeholder="pvz: 1200 800 5 arba 1200 800",
-    key="piece_input"
+raw_input = st.text_area(
+    "Vienoje eilutėje – vienas ruošinys:",
+    value=st.session_state.pieces_input,
+    height=150,
+    key="pieces_input_area"
 )
 
-# Mobili skaičių klaviatūra - VISI MYGTUKAI VIENAME VIETE
-st.write("**Skaičių klaviatūra:**")
+# Skaičių klaviatūra
+st.write("#### Skaičių klaviatūra:")
+col_nums = st.columns([1, 1, 1, 1])
+buttons = [
+    ["7", "8", "9", " "],
+    ["4", "5", "6", "x"],
+    ["1", "2", "3", "←"],
+    ["0", ".", "Enter", "Clear"]
+]
 
-# Pirmoji eilutė: 1 2 3
-cols = st.columns(3)
-with cols[0]:
-    if st.button("1", use_container_width=True, key="btn1"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "1"
-with cols[1]:
-    if st.button("2", use_container_width=True, key="btn2"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "2"
-with cols[2]:
-    if st.button("3", use_container_width=True, key="btn3"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "3"
+for row in buttons:
+    with st.container():
+        cols = st.columns(4)
+        for i, btn in enumerate(row):
+            with cols[i]:
+                if st.button(btn, key=f"num_{btn}", help=btn):
+                    current_input = st.session_state.pieces_input
+                    if btn == "←":
+                        st.session_state.pieces_input = current_input[:-1]
+                    elif btn == "Clear":
+                        st.session_state.pieces_input = ""
+                    elif btn == "Enter":
+                        st.session_state.pieces_input = current_input + "\n"
+                    else:
+                        st.session_state.pieces_input = current_input + btn
+                    st.rerun()
 
-# Antroji eilutė: 4 5 6
-cols = st.columns(3)
-with cols[0]:
-    if st.button("4", use_container_width=True, key="btn4"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "4"
-with cols[1]:
-    if st.button("5", use_container_width=True, key="btn5"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "5"
-with cols[2]:
-    if st.button("6", use_container_width=True, key="btn6"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "6"
+# ======================
+# 🔍 PARSINGAS
+# ======================
+def parse_pieces(text):
+    pieces = []
+    for line in text.strip().splitlines():
+        if not line.strip():
+            continue
+        # Pakeičiame tarpus į 'x' ir padalijame
+        line = line.replace(" ", "x").strip()
+        parts = line.split("x")
+        try:
+            if len(parts) == 3:
+                w, h, qty = map(int, parts)
+            elif len(parts) == 2:
+                w, h = map(int, parts)
+                qty = 1
+            else:
+                continue
+            for _ in range(qty):
+                pieces.append((w, h))
+        except:
+            st.warning(f"Klaida eilutėje: {line}")
+    return pieces
 
-# Trečioji eilutė: 7 8 9
-cols = st.columns(3)
-with cols[0]:
-    if st.button("7", use_container_width=True, key="btn7"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "7"
-with cols[1]:
-    if st.button("8", use_container_width=True, key="btn8"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "8"
-with cols[2]:
-    if st.button("9", use_container_width=True, key="btn9"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "9"
-
-# Ketvirtoji eilutė: 0 Tarpas ←
-cols = st.columns(3)
-with cols[0]:
-    if st.button("0", use_container_width=True, key="btn0"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + "0"
-with cols[1]:
-    if st.button("Tarpas", use_container_width=True, key="btn_space"):
-        st.session_state.piece_input = st.session_state.get('piece_input', '') + " "
-with cols[2]:
-    if st.button("←", use_container_width=True, key="btn_backspace"):
-        current_text = st.session_state.get('piece_input', '')
-        if current_text:
-            st.session_state.piece_input = current_text[:-1]
-
-# Ruošinių valdymo mygtukai
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("➕ Pridėti ruošinį", use_container_width=True, type="primary"):
-        if st.session_state.get('piece_input', '').strip():
-            try:
-                # Apdorojame įvestį su tarpais
-                input_text = st.session_state.piece_input.strip()
-                parts = input_text.split()
-                
-                if len(parts) == 2:
-                    w, h = int(parts[0]), int(parts[1])
-                    qty = 1
-                elif len(parts) == 3:
-                    w, h, qty = int(parts[0]), int(parts[1]), int(parts[2])
-                else:
-                    st.error("❌ Neteisingas formatas! Naudokite: plotis aukštis kiekis")
-                    st.stop()
-                
-                # Pridedame į sąrašą
-                for _ in range(qty):
-                    st.session_state.pieces_list.append((w, h))
-                
-                st.session_state.piece_input = ""
-                st.success(f"✅ Pridėta: {w}×{h} mm - {qty} vnt.")
-                
-            except ValueError:
-                st.error("❌ Klaida: Įveskite teisingus skaičius!")
-with col2:
-    if st.button("🗑️ Išvalyti viską", use_container_width=True):
-        st.session_state.pieces_list = []
-        st.session_state.piece_input = ""
-        st.success("✅ Visi ruošiniai išvalyti")
-
-# Rodyti esamus ruošinius
-if st.session_state.pieces_list:
-    st.write("### 📋 Esami ruošiniai:")
-    piece_counts = Counter(st.session_state.pieces_list)
-    for (w, h), count in piece_counts.items():
-        st.write(f"- {w} × {h} mm: {count} vnt.")
-    st.write(f"**Iš viso:** {len(st.session_state.pieces_list)} ruošiniai")
-else:
-    st.info("📝 Ruošinių sąrašas tuščias. Pridėkite ruošinių naudodami skaičių klaviatūrą.")
+pieces = parse_pieces(raw_input)
 
 # ======================
 # 🧠 OPTIMIZATORIAUS LOGIKA
@@ -193,7 +167,6 @@ class OptimalPacker:
 
     def _initialize_optimal_layouts(self):
         layouts = {}
-
         # 1200×800 optimalus layoutas
         layouts[(1200, 800)] = [
             (0, 0, 800, 1200, True),
@@ -202,7 +175,6 @@ class OptimalPacker:
             (0, 1200, 1200, 800, False),
             (1200, 1200, 1200, 800, False)
         ]
-
         # 800×1200 optimalus layoutas
         layouts[(800, 1200)] = [
             (0, 0, 1200, 800, True),
@@ -211,7 +183,6 @@ class OptimalPacker:
             (800, 800, 800, 1200, False),
             (1600, 800, 800, 1200, False)
         ]
-
         return layouts
 
     def pack_all_pieces(self, all_pieces):
@@ -354,36 +325,73 @@ def draw_optimal_board(board_data, width, height, title):
         color = colors[i % len(colors)]
         rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='darkblue', facecolor=color, alpha=0.8)
         ax.add_patch(rect)
-        ax.text(x + w / 2, y + h / 2, f"{w}×{h}", ha='center', va='center', fontsize=8, fontweight='bold')
+        text = f"{w}×{h}"
+        if rotated:
+            text += " R"
+        ax.text(x + w / 2, y + h / 2, text, ha='center', va='center', fontsize=8, fontweight='bold')
 
-    ax.invert_yaxis()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     return fig
 
 # ======================
-# 🧾 PDF GENERAVIMAS
+# 🧾 PDF GENERAVIMAS SU SPALVOMIS
 # ======================
 def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas):
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=landscape(A4))
-    scale = min((A4[0] - 80 * mm) / width, (A4[1] - 80 * mm) / height)
+    
+    scale = min((A4[0] - 100 * mm) / width, (A4[1] - 100 * mm) / height)
+    
+    colors = [
+        (1.0, 0.42, 0.42),  # #FF6B6B
+        (0.30, 0.80, 0.77),  # #4ECDC4
+        (0.27, 0.72, 0.82),  # #45B7D1
+        (0.59, 0.81, 0.71),  # #96CEB4
+        (1.0, 0.92, 0.65),  # #FFEAA7
+        (0.87, 0.63, 0.87),  # #DDA0DD
+        (0.53, 0.81, 0.92)   # #87CEEB
+    ]
+    
     for i, board_data in enumerate(boards, 1):
         pieces = board_data['pieces']
         efficiency = board_data['efficiency']
+        
         c.setFont("Helvetica-Bold", 16)
-        c.drawString(40 * mm, A4[1] - 30 * mm, f"{uzsakymo_nr} – Korta {i} ({plokstes_tipas})")
+        c.drawString(50 * mm, A4[1] - 40 * mm, f"{uzsakymo_nr} – Korta {i} ({plokstes_tipas})")
         c.setFont("Helvetica", 10)
-        c.drawString(40 * mm, A4[1] - 45 * mm, f"Išeiga: {efficiency:.1f}%")
-        for (x, y, w, h, rotated) in pieces:
-            sx = 40 * mm + x * scale
-            sy = 40 * mm + y * scale
+        c.drawString(50 * mm, A4[1] - 55 * mm, f"Išeiga: {efficiency:.1f}% | Ruošiniai: {len(pieces)}")
+        
+        for j, (x, y, w, h, rotated) in enumerate(pieces):
+            color = colors[j % len(colors)]
+            sx = 50 * mm + x * scale
+            sy = 50 * mm + y * scale
             sw = w * scale
             sh = h * scale
-            c.rect(sx, sy, sw, sh)
-            c.setFont("Helvetica", 7)
-            c.drawCentredString(sx + sw / 2, sy + sh / 2, f"{w}×{h}")
+            
+            c.setFillColorRGB(*color)
+            c.setStrokeColorRGB(0.17, 0.24, 0.31)
+            c.setLineWidth(1)
+            c.rect(sx, sy, sw, sh, fill=1)
+            
+            c.setFillColorRGB(0, 0, 0)
+            c.setFont("Helvetica-Bold", 6)
+            text = f"{w}×{h}"
+            if rotated:
+                text += " R"
+            c.drawCentredString(sx + sw / 2, sy + sh / 2, text)
+        
+        c.setFillColorRGB(0, 0, 0, 0)
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(2)
+        c.rect(50 * mm, 50 * mm, width * scale, height * scale)
+        
+        c.setFont("Helvetica", 8)
+        c.drawString(50 * mm, 45 * mm, f"{width} mm")
+        c.drawString(45 * mm, 50 * mm + height * scale / 2, f"{height} mm")
+        
         c.showPage()
+    
     c.save()
     buf.seek(0)
     return buf
@@ -391,13 +399,13 @@ def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas):
 # ======================
 # 🚀 PAGRINDINĖ LOGIKA
 # ======================
-if st.button("🚀 GENERUOTI OPTIMALŲ IŠDĖSTYMĄ", type="primary"):
-    if not st.session_state.pieces_list:
-        st.warning("Pridėkite bent vieną ruošinį.")
+if st.button("🚀 GENERUOTI OPTIMALŲ IŠDĖSTYMĄ"):
+    if not pieces:
+        st.warning("Įvesk bent vieną ruošinį.")
     else:
         with st.spinner("Kuriamas optimalus ruošinių išdėstymas..."):
             packer = OptimalPacker(kortos_ilgis, kortos_plotis)
-            boards = packer.pack_all_pieces(st.session_state.pieces_list)
+            boards = packer.pack_all_pieces(pieces)
 
         st.subheader("📊 OPTIMALUS RUOŠINIŲ IŠDĖSTYMAS")
 
@@ -414,30 +422,29 @@ if st.button("🚀 GENERUOTI OPTIMALŲ IŠDĖSTYMĄ", type="primary"):
 
         st.success(f"🎉 **Baigta! Bendra išeiga: {overall_efficiency:.1f}%**")
         pdf_buf = generate_optimal_pdf(boards, kortos_ilgis, kortos_plotis, uzsakymo_nr, plokstes_tipas)
-        st.download_button("📥 Atsisiųsti PDF", pdf_buf, f"{uzsakymo_nr}_planas.pdf", "application/pdf")
+        st.download_button(
+            "📥 Atsisiųsti PDF",
+            pdf_buf,
+            f"{uzsakymo_nr}_planas.pdf",
+            "application/pdf"
+        )
 
 # ======================
 # ℹ️ ŠONINĖ INFO
 # ======================
 st.sidebar.header("📊 Statistika")
-if st.session_state.pieces_list:
-    piece_counts = Counter(st.session_state.pieces_list)
+if pieces:
+    piece_counts = Counter(pieces)
+    st.sidebar.write(f"**Viso ruošinių:** {len(pieces)}")
     for (w, h), count in piece_counts.items():
         st.sidebar.write(f"{w}×{h}: {count} vnt.")
-    st.sidebar.write(f"**Iš viso:** {len(st.session_state.pieces_list)} ruošiniai")
 
 st.sidebar.header("ℹ️ Naudojimo instrukcija")
-st.sidebar.write("""
-**Kaip įvesti ruošinius:**
-- Naudokite skaičių klaviatūrą
-- Formatas: `plotis aukštis kiekis`
-- Pavyzdžiai:
-  - `1200 800 5` (5 ruošiniai)
-  - `1200 800` (1 ruošinys)
-
-**Mygtukai:**
-- **Tarpas** - tarpas tarp skaičių
-- **←** - ištrinti paskutinį simbolį
-- **➕ Pridėti** - įtraukti į sąrašą
-- **🗑️ Išvalyti** - ištrinti viską
+st.sidebar.markdown("""
+1. Įveskite užsakymo numerį
+2. Pasirinkite plokštės tipą
+3. Pasirinkite kortos dydį arba įveskite savo
+4. Įveskite ruošinius (pvz., 1200 800 5)
+5. Naudokite skaičių klaviatūrą
+6. Spustelėkite „Generuoti“
 """)
