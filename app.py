@@ -33,6 +33,14 @@ st.markdown("""
         font-size: 20px !important;
         text-align: center;
     }
+    .clear-button > button {
+        width: 100%;
+        height: 40px;
+        font-size: 18px;
+        background-color: #ff4d4d;
+        color: white;
+        border-radius: 10px;
+    }
 </style>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -83,12 +91,29 @@ except:
 
 st.write("### Įvesk ruošinius:")
 st.markdown("**Pastaba**: Vietoje 'x' galite naudoti tarpą, pvz., `1200 800 5` arba `1200x800x5`")
-raw_input = st.text_area(
-    "Vienoje eilutėje – vienas ruošinys (pvz. 1200 800 5):",
-    "",
-    height=200,
-    placeholder="Įveskite ruošinius, pvz., 1200 800 5\n504 769\n1030 290"
-)
+
+# NAUJAS: Sesijos būsena ruošinių laukui
+if 'pieces_input' not in st.session_state:
+    st.session_state.pieces_input = ""
+
+# NAUJAS: Funkcija, išvalanti ruošinių lauką
+def clear_pieces_input():
+    st.session_state.pieces_input = ""
+
+# NAUJAS: Išdėstymas su išvalymo mygtuku
+col_text, col_button = st.columns([3, 1])
+with col_text:
+    raw_input = st.text_area(
+        "Vienoje eilutėje – vienas ruošinys (pvz. 1200 800 5):",
+        value=st.session_state.pieces_input,
+        height=200,
+        placeholder="Įveskite ruošinius, pvz., 1200 800 5\n504 769\n1030 290",
+        key="pieces_input"
+    )
+with col_button:
+    st.markdown('<div class="clear-button">', unsafe_allow_html=True)
+    st.button("Išvalyti duomenis", on_click=clear_pieces_input)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================
 # 🔍 PARSINGAS
@@ -132,7 +157,7 @@ class OptimalPacker:
         layouts[(1200, 800)] = [
             (0, 0, 800, 1200, True),
             (800, 0, 800, 1200, True),
-            (1600, 0, 800, 1200, True),
+            (1600,  0, 800, 1200, True),
             (0, 1200, 1200, 800, False),
             (1200, 1200, 1200, 800, False)
         ]
