@@ -4,6 +4,9 @@ import matplotlib.patches as patches
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import mm
+from reportlab.platypus import SimpleDocTemplate, Image, Spacer
+from reportlab.lib.pagesizes import landscape, A4
+import tempfile
 import io
 import math
 from collections import Counter
@@ -282,29 +285,40 @@ def draw_optimal_board(board_data, width, height, title):
 # ======================
 # 🧾 PDF GENERAVIMAS
 # ======================
+
+
 def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas):
     buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=landscape(A4))
-    scale = min((A4[0] - 80 * mm) / width, (A4[1] - 80 * mm) / height)
+    pdf = SimpleDocTemplate(buf, pagesize=landscape(A4))
+
+    elements = []
+    temp_images = []
+
     for i, board_data in enumerate(boards, 1):
-        pieces = board_data['pieces']
-        efficiency = board_data['efficiency']
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(40 * mm, A4[1] - 30 * mm, f"{uzsakymo_nr} – Korta {i} ({plokstes_tipas})")
-        c.setFont("Helvetica", 10)
-        c.drawString(40 * mm, A4[1] - 45 * mm, f"Išeiga: {efficiency:.1f}%")
-        for (x, y, w, h, rotated) in pieces:
-            sx = 40 * mm + x * scale
-            sy = 40 * mm + y * scale
-            sw = w * scale
-            sh = h * scale
-            c.rect(sx, sy, sw, sh)
-            c.setFont("Helvetica", 7)
-            c.drawCentredString(sx + sw / 2, sy + sh / 2, f"{w}×{h}")
-        c.showPage()
-    c.save()
+        # Naudojame tą pačią vizualizaciją kaip ekrane
+        fig = draw_optimal_board(board_data, width, height, f"{uzsakymo_nr} – Korta {i}")
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        fig.savefig(temp_file.name, bbox_inches='tight', dpi=150)
+        plt.close(fig)
+
+        # Įtraukiame į PDF
+        elements.append(Image(temp_file.name, width=750, height=520))
+        elements.append(Spacer(1, 12))
+        temp_images.append(temp_file.name)
+
+    pdf.build(elements)
+
+    # Išvalome laikinus paveikslėlius
+    for temp_path in temp_images:
+        try:
+            import os
+            os.remove(temp_path)
+        except:
+            pass
+
     buf.seek(0)
     return buf
+
 
 
 # ======================
