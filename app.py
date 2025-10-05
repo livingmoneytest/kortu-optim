@@ -289,33 +289,36 @@ def draw_optimal_board(board_data, width, height, title):
 
 def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas):
     buf = io.BytesIO()
-    pdf = SimpleDocTemplate(buf, pagesize=landscape(A4))
+    c = canvas.Canvas(buf, pagesize=landscape(A4))
 
-    elements = []
-    temp_images = []
+    scale = min((A4[0] - 80 * mm) / width, (A4[1] - 80 * mm) / height)
 
     for i, board_data in enumerate(boards, 1):
-        # Naudojame tą pačią vizualizaciją kaip ekrane
-        fig = draw_optimal_board(board_data, width, height, f"{uzsakymo_nr} – Korta {i}")
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        fig.savefig(temp_file.name, bbox_inches='tight', dpi=150)
-        plt.close(fig)
+        pieces = board_data['pieces']
+        efficiency = board_data['efficiency']
 
-        # Įtraukiame į PDF
-        elements.append(Image(temp_file.name, width=750, height=520))
-        elements.append(Spacer(1, 12))
-        temp_images.append(temp_file.name)
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(40 * mm, A4[1] - 30 * mm, f"{uzsakymo_nr} -- Korta {i}")
+        c.setFont("Helvetica", 10)
+        c.drawString(40 * mm, A4[1] - 45 * mm, f"Tipas: {board_data['type']} | Išeiga: {efficiency:.1f}%")
 
-    pdf.build(elements)
+        for (x, y, w, h, rotated) in pieces:
+            sx = 40 * mm + x * scale
+            sy = 40 * mm + y * scale
+            sw = w * scale
+            sh = h * scale
 
-    # Išvalome laikinus paveikslėlius
-    for temp_path in temp_images:
-        try:
-            import os
-            os.remove(temp_path)
-        except:
-            pass
+            c.rect(sx, sy, sw, sh)
+            c.setFont("Helvetica-Bold", 6)
+            c.drawCentredString(sx + sw / 2, sy + sh / 2, f"{w}×{h}")
 
+            if rotated:
+                c.setFont("Helvetica", 5)
+                c.drawString(sx + 1 * mm, sy + 1 * mm, "R")
+
+        c.showPage()
+
+    c.save()
     buf.seek(0)
     return buf
 
