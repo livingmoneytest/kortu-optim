@@ -8,355 +8,338 @@ import io
 import math
 from collections import Counter
 
-# Mobile optimized version
-st.set_page_config(
-    page_title="Board Optimizer",
-    page_icon="🪚",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
+# ======================
+# 📱 MOBILUS DIZAINAS
+# ======================
+st.set_page_config(page_title="Optimalus kortų optimizatorius", layout="centered")
 
-# Custom CSS for mobile
 st.markdown("""
 <style>
-    .main > div {
-        padding: 0.5rem;
+    .stTextInput > div > div > input {
+        font-size: 20px !important;
+        text-align: center;
     }
     .stButton > button {
         width: 100%;
-        height: 3rem;
-        font-size: 1.1rem;
-        margin: 0.2rem 0;
-    }
-    .number-btn {
-        width: 100% !important;
-        height: 3rem !important;
-        font-size: 1.2rem !important;
-        margin: 0.1rem !important;
-    }
-    .input-section {
-        background-color: #f8f9fa;
-        padding: 1rem;
+        height: 60px;
+        font-size: 22px;
+        background-color: #2b8a3e;
+        color: white;
         border-radius: 10px;
-        margin-bottom: 1rem;
     }
-    .piece-item {
-        background-color: #e9ecef;
-        padding: 0.5rem;
-        margin: 0.2rem 0;
-        border-radius: 5px;
-        font-size: 0.9rem;
+    .stTextArea textarea {
+        font-size: 18px !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🪚 Board Optimizer")
-st.write("Mobile-optimized board cutting layout generator")
+# ======================
+# 🪚 PAGRINDINĖ ANTRAŠTĖ
+# ======================
+st.title("🪚 Optimalus kortų optimizatorius (mobilus)")
+st.write("Automatinis ruošinių išdėstymas pagal optimalius layout'us")
 
-class MobileOptimizer:
-    def __init__(self, board_width=2800, board_height=2070):
-        self.board_width = board_width
-        self.board_height = board_height
-        self.optimal_layouts = {
-            (1200, 800): [
-                (0, 0, 800, 1200, True),
-                (800, 0, 800, 1200, True),
-                (1600, 0, 800, 1200, True),
-                (0, 1200, 1200, 800, False),
-                (1200, 1200, 1200, 800, False)
-            ]
-        }
-    
-    def parse_piece_input(self, text):
-        """Parse piece input with multiple formats support"""
-        if not text.strip():
-            return None, None, None
-            
-        # Replace multiple spaces with single space and split
-        parts = text.strip().replace('x', ' ').replace('×', ' ').split()
-        
-        try:
-            if len(parts) == 2:
-                w, h = int(parts[0]), int(parts[1])
-                return w, h, 1
-            elif len(parts) == 3:
-                w, h, qty = int(parts[0]), int(parts[1]), int(parts[2])
-                return w, h, qty
-        except:
-            pass
-            
-        return None, None, None
-    
-    def pack_pieces(self, pieces):
-        """Pack pieces using optimal layouts when possible"""
-        boards = []
-        remaining = pieces.copy()
-        
-        # Process 1200x800 pieces with optimal layout
-        count_1200x800 = sum(1 for p in remaining if p == (1200, 800))
-        optimal_boards = count_1200x800 // 5
-        
-        for i in range(optimal_boards):
-            boards.append({
-                'pieces': self.optimal_layouts[(1200, 800)].copy(),
-                'type': 'optimal_1200x800',
-                'efficiency': 85.1
-            })
-            # Remove used pieces
-            for _ in range(5):
-                remaining.remove((1200, 800))
-        
-        # Pack remaining pieces using simple algorithm
-        while remaining:
-            board_pieces = []
-            current_x, current_y, row_height = 0, 0, 0
-            
-            for piece in remaining[:]:
-                w, h = piece
-                placed = False
-                
-                # Try both orientations
-                for orientation in [False, True]:
-                    if orientation:
-                        pw, ph = h, w
-                    else:
-                        pw, ph = w, h
-                    
-                    if current_x + pw <= self.board_width and current_y + ph <= self.board_height:
-                        board_pieces.append((current_x, current_y, pw, ph, orientation))
-                        current_x += pw
-                        row_height = max(row_height, ph)
-                        remaining.remove(piece)
-                        placed = True
-                        break
-                
-                if not placed:
-                    # Try new row
-                    if current_y + row_height + min(h, w) <= self.board_height:
-                        current_x = 0
-                        current_y += row_height
-                        row_height = 0
-                        continue
-                    else:
-                        break
-            
-            if board_pieces:
-                used_area = sum(w * h for _, _, w, h, _ in board_pieces)
-                efficiency = (used_area / (self.board_width * self.board_height)) * 100
-                boards.append({
-                    'pieces': board_pieces,
-                    'type': 'standard',
-                    'efficiency': efficiency
-                })
-            elif remaining:
-                # Force place first piece
-                piece = remaining[0]
-                boards.append({
-                    'pieces': [(0, 0, piece[0], piece[1], False)],
-                    'type': 'fallback',
-                    'efficiency': (piece[0] * piece[1]) / (self.board_width * self.board_height) * 100
-                })
-                remaining.remove(piece)
-        
-        return boards
-
-# Initialize session state
-if 'pieces' not in st.session_state:
-    st.session_state.pieces = []
-if 'current_input' not in st.session_state:
-    st.session_state.current_input = ""
-
-# Input sections
-st.markdown('<div class="input-section">', unsafe_allow_html=True)
-
+# ======================
+# 🔢 DUOMENŲ ĮVESTIS
+# ======================
 col1, col2 = st.columns(2)
 with col1:
-    order_no = st.text_input("Order No:", "ORDER001")
+    uzsakymo_nr = st.text_input("Užsakymo numeris:", "UZS001")
 with col2:
-    board_type = st.selectbox("Board Type:", ["MDF", "HDF", "LDF", "MDP", "PPD", "OTHER"])
+    plokstes_tipas = st.text_input("Plokštės tipas:", "MDF")
 
-# Fixed board size (2800x2070 as default)
-board_width, board_height = 2800, 2070
-st.info(f"Board Size: {board_width} × {board_height} mm")
+st.write("### Greiti plokštės šablonai:")
+kortos_variantas = st.radio(
+    "Pasirink kortos dydį:",
+    ["2800x2070 (standartinė)", "3050x1830 (didelė)", "custom"],
+    horizontal=True
+)
 
-st.markdown('</div>', unsafe_allow_html=True)
+if kortos_variantas == "custom":
+    kortos_matmenys = st.text_input("Įvesk kortos matmenis:", "2800x2070")
+else:
+    kortos_matmenys = kortos_variantas.split(" ")[0]
 
-# Pieces input section
-st.markdown('<div class="input-section">', unsafe_allow_html=True)
-st.subheader("Add Pieces")
+try:
+    kortos_ilgis, kortos_plotis = [int(x) for x in kortos_matmenys.lower().split("x")]
+except:
+    st.error("❌ Įvesk formatu: 2800x2070")
+    st.stop()
 
-# Current input display
-st.text_input("Current Piece:", value=st.session_state.current_input, key="display_input", disabled=True)
+st.write("### Įvesk ruošinius:")
+raw_input = st.text_area(
+    "Vienoje eilutėje – vienas ruošinys (pvz. 1200x800x5):",
+    "1200x800x5\n504x769\n1030x290\n1340x540\n788x700\n290x1030\n222x700",
+    height=200
+)
 
-# Number pad
-st.write("Enter dimensions (width height quantity):")
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    if st.button("1", key="btn1", use_container_width=True):
-        st.session_state.current_input += "1"
-    if st.button("4", key="btn4", use_container_width=True):
-        st.session_state.current_input += "4"
-    if st.button("7", key="btn7", use_container_width=True):
-        st.session_state.current_input += "7"
-    if st.button("0", key="btn0", use_container_width=True):
-        st.session_state.current_input += "0"
-
-with col2:
-    if st.button("2", key="btn2", use_container_width=True):
-        st.session_state.current_input += "2"
-    if st.button("5", key="btn5", use_container_width=True):
-        st.session_state.current_input += "5"
-    if st.button("8", key="btn8", use_container_width=True):
-        st.session_state.current_input += "8"
-    if st.button("Space", key="btn_space", use_container_width=True):
-        st.session_state.current_input += " "
-
-with col3:
-    if st.button("3", key="btn3", use_container_width=True):
-        st.session_state.current_input += "3"
-    if st.button("6", key="btn6", use_container_width=True):
-        st.session_state.current_input += "6"
-    if st.button("9", key="btn9", use_container_width=True):
-        st.session_state.current_input += "9"
-    if st.button("Clear", key="btn_clear", use_container_width=True):
-        st.session_state.current_input = ""
-
-# Add piece button
-col1, col2 = st.columns([1, 1])
-with col1:
-    if st.button("📥 Add Piece", use_container_width=True):
-        if st.session_state.current_input.strip():
-            optimizer = MobileOptimizer()
-            w, h, qty = optimizer.parse_piece_input(st.session_state.current_input)
-            if w and h and qty:
-                for _ in range(qty):
-                    st.session_state.pieces.append((w, h))
-                st.session_state.current_input = ""
-                st.rerun()
+# ======================
+# 🔍 PARSINGAS
+# ======================
+def parse_pieces(text):
+    pieces = []
+    for line in text.strip().splitlines():
+        if "x" not in line:
+            continue
+        parts = line.strip().split("x")
+        try:
+            if len(parts) == 3:
+                w, h, qty = map(int, parts)
+            elif len(parts) == 2:
+                w, h = map(int, parts)
+                qty = 1
             else:
-                st.error("Invalid format! Use: width height quantity")
-with col2:
-    if st.button("🗑️ Clear All", use_container_width=True):
-        st.session_state.pieces = []
-        st.session_state.current_input = ""
-        st.rerun()
+                continue
+            for _ in range(qty):
+                pieces.append((w, h))
+        except:
+            st.warning(f"Klaida eilutėje: {line}")
+    return pieces
 
-# Show current pieces
-if st.session_state.pieces:
-    st.write("Current Pieces:")
-    piece_counts = Counter(st.session_state.pieces)
-    for (w, h), count in piece_counts.items():
-        st.markdown(f'<div class="piece-item">{w}×{h} mm: {count} pcs</div>', unsafe_allow_html=True)
-    
-    st.write(f"Total pieces: {len(st.session_state.pieces)}")
+pieces = parse_pieces(raw_input)
 
-st.markdown('</div>', unsafe_allow_html=True)
+# ======================
+# 🧠 OPTIMIZATORIAUS LOGIKA (TAVO VERSIJA)
+# ======================
+class OptimalPacker:
+    def __init__(self, board_width, board_height):
+        self.board_width = board_width
+        self.board_height = board_height
+        self.optimal_layouts = self._initialize_optimal_layouts()
 
-# Generate layout
-if st.button("🚀 GENERATE OPTIMAL LAYOUT", type="primary"):
-    if not st.session_state.pieces:
-        st.error("Please add at least one piece")
+    def _initialize_optimal_layouts(self):
+        layouts = {}
+
+        # 1200×800 optimalus layoutas
+        layouts[(1200, 800)] = [
+            (0, 0, 800, 1200, True),
+            (800, 0, 800, 1200, True),
+            (1600, 0, 800, 1200, True),
+            (0, 1200, 1200, 800, False),
+            (1200, 1200, 1200, 800, False)
+        ]
+
+        # 800×1200 optimalus layoutas
+        layouts[(800, 1200)] = [
+            (0, 0, 1200, 800, True),
+            (1200, 0, 1200, 800, True),
+            (0, 800, 800, 1200, False),
+            (800, 800, 800, 1200, False),
+            (1600, 800, 800, 1200, False)
+        ]
+
+        return layouts
+
+    def pack_all_pieces(self, all_pieces):
+        boards = []
+        remaining_pieces = all_pieces.copy()
+        optimized_pieces = []
+        standard_pieces = []
+
+        for piece in remaining_pieces:
+            if piece in self.optimal_layouts:
+                optimized_pieces.append(piece)
+            else:
+                standard_pieces.append(piece)
+
+        boards.extend(self._pack_optimized_pieces(optimized_pieces))
+        if standard_pieces:
+            boards.extend(self._pack_standard_pieces(standard_pieces))
+        return boards
+
+    def _pack_optimized_pieces(self, optimized_pieces):
+        boards = []
+        piece_groups = {}
+        for piece in optimized_pieces:
+            if piece not in piece_groups:
+                piece_groups[piece] = 0
+            piece_groups[piece] += 1
+
+        for piece_type, count in piece_groups.items():
+            optimal_layout = self.optimal_layouts[piece_type]
+            pieces_per_board = len(optimal_layout)
+            full_boards = count // pieces_per_board
+            remaining_pieces = count % pieces_per_board
+
+            for _ in range(full_boards):
+                boards.append({
+                    'pieces': optimal_layout.copy(),
+                    'free_rects': self._calculate_free_rectangles(optimal_layout),
+                    'efficiency': self._calculate_efficiency(optimal_layout),
+                    'type': f'optimal_{piece_type[0]}x{piece_type[1]}'
+                })
+
+            if remaining_pieces > 0:
+                remaining_list = [piece_type] * remaining_pieces
+                boards.extend(self._pack_standard_pieces(remaining_list))
+        return boards
+
+    def _pack_standard_pieces(self, standard_pieces):
+        boards = []
+        remaining_pieces = standard_pieces.copy()
+
+        while remaining_pieces:
+            board_pieces = []
+            occupied_positions = []
+            remaining_pieces.sort(key=lambda x: x[0] * x[1], reverse=True)
+
+            for piece in remaining_pieces[:]:
+                position = self._find_free_position_for_standard(piece, occupied_positions, board_pieces)
+                if position:
+                    x, y, w, h, rotated = position
+                    board_pieces.append((x, y, w, h, rotated))
+                    occupied_positions.append((x, y, x + w, y + h))
+                    remaining_pieces.remove(piece)
+
+            if board_pieces:
+                boards.append({
+                    'pieces': board_pieces,
+                    'free_rects': self._calculate_free_rectangles(board_pieces),
+                    'efficiency': self._calculate_efficiency(board_pieces),
+                    'type': 'standard'
+                })
+            else:
+                if remaining_pieces:
+                    first_piece = remaining_pieces[0]
+                    board_pieces = [(0, 0, first_piece[0], first_piece[1], False)]
+                    boards.append({
+                        'pieces': board_pieces,
+                        'free_rects': self._calculate_free_rectangles(board_pieces),
+                        'efficiency': self._calculate_efficiency(board_pieces),
+                        'type': 'fallback'
+                    })
+                    remaining_pieces.remove(first_piece)
+        return boards
+
+    def _find_free_position_for_standard(self, piece, occupied_positions, existing_pieces):
+        w, h = piece
+        for orientation in [False, True]:
+            if orientation:
+                piece_width, piece_height = h, w
+            else:
+                piece_width, piece_height = w, h
+            candidate_positions = [(0, 0)]
+            for existing_x, existing_y, existing_w, existing_h, _ in existing_pieces:
+                candidate_positions.append((existing_x + existing_w, existing_y))
+                candidate_positions.append((existing_x, existing_y + existing_h))
+            for x, y in candidate_positions:
+                if x + piece_width <= self.board_width and y + piece_height <= self.board_height:
+                    if not self._check_collision(x, y, piece_width, piece_height, occupied_positions):
+                        return (x, y, piece_width, piece_height, orientation)
+        return None
+
+    def _check_collision(self, x, y, w, h, occupied_positions):
+        new_rect = (x, y, x + w, y + h)
+        for occupied in occupied_positions:
+            ox1, oy1, ox2, oy2 = occupied
+            if not (x + w <= ox1 or x >= ox2 or y + h <= oy1 or y >= oy2):
+                return True
+        return False
+
+    def _calculate_free_rectangles(self, layout):
+        if not layout:
+            return [(0, 0, self.board_width, self.board_height)]
+        max_height = 0
+        for x, y, w, h, _ in layout:
+            max_height = max(max_height, y + h)
+        if max_height < self.board_height:
+            return [(0, max_height, self.board_width, self.board_height - max_height)]
+        return []
+
+    def _calculate_efficiency(self, layout):
+        if not layout:
+            return 0
+        used_area = sum(w * h for _, _, w, h, _ in layout)
+        total_area = self.board_width * self.board_height
+        return (used_area / total_area) * 100
+
+
+# ======================
+# 🎨 BRAIŽYMAS
+# ======================
+def draw_optimal_board(board_data, width, height, title):
+    fig, ax = plt.subplots(figsize=(10, 7))
+    ax.set_xlim(0, width)
+    ax.set_ylim(0, height)
+    ax.set_aspect('equal')
+    ax.set_title(title, fontsize=14, fontweight='bold')
+
+    pieces = board_data['pieces']
+    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#87CEEB']
+
+    for i, (x, y, w, h, rotated) in enumerate(pieces):
+        color = colors[i % len(colors)]
+        rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='darkblue', facecolor=color, alpha=0.8)
+        ax.add_patch(rect)
+        ax.text(x + w / 2, y + h / 2, f"{w}×{h}", ha='center', va='center', fontsize=8, fontweight='bold')
+
+    ax.invert_yaxis()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    return fig
+
+
+# ======================
+# 🧾 PDF GENERAVIMAS
+# ======================
+def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas):
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=landscape(A4))
+    scale = min((A4[0] - 80 * mm) / width, (A4[1] - 80 * mm) / height)
+    for i, board_data in enumerate(boards, 1):
+        pieces = board_data['pieces']
+        efficiency = board_data['efficiency']
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(40 * mm, A4[1] - 30 * mm, f"{uzsakymo_nr} – Korta {i} ({plokstes_tipas})")
+        c.setFont("Helvetica", 10)
+        c.drawString(40 * mm, A4[1] - 45 * mm, f"Išeiga: {efficiency:.1f}%")
+        for (x, y, w, h, rotated) in pieces:
+            sx = 40 * mm + x * scale
+            sy = 40 * mm + y * scale
+            sw = w * scale
+            sh = h * scale
+            c.rect(sx, sy, sw, sh)
+            c.setFont("Helvetica", 7)
+            c.drawCentredString(sx + sw / 2, sy + sh / 2, f"{w}×{h}")
+        c.showPage()
+    c.save()
+    buf.seek(0)
+    return buf
+
+
+# ======================
+# 🚀 PAGRINDINĖ LOGIKA
+# ======================
+if st.button("🚀 GENERUOTI OPTIMALŲ IŠDĖSTYMĄ"):
+    if not pieces:
+        st.warning("Įvesk bent vieną ruošinį.")
     else:
-        with st.spinner("Generating optimal layout..."):
-            optimizer = MobileOptimizer()
-            boards = optimizer.pack_pieces(st.session_state.pieces)
-            
-            # Display results
-            st.subheader("📊 Optimization Results")
-            
-            total_pieces = sum(len(b['pieces']) for b in boards)
-            optimal_boards = sum(1 for b in boards if b['type'] == 'optimal_1200x800')
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Boards", len(boards))
-            with col2:
-                st.metric("Pieces", total_pieces)
-            with col3:
-                st.metric("Optimized", optimal_boards)
-            
-            # Show each board
-            for i, board in enumerate(boards):
-                with st.expander(f"Board {i+1} ({board['type']}) - Efficiency: {board['efficiency']:.1f}%"):
-                    # Create visualization
-                    fig, ax = plt.subplots(figsize=(10, 8))
-                    ax.set_xlim(0, board_width)
-                    ax.set_ylim(0, board_height)
-                    ax.set_aspect('equal')
-                    
-                    # Draw pieces
-                    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
-                    for j, (x, y, w, h, rotated) in enumerate(board['pieces']):
-                        color = colors[j % len(colors)]
-                        rect = patches.Rectangle((x, y), w, h, linewidth=2,
-                                              edgecolor='darkblue', facecolor=color, alpha=0.8)
-                        ax.add_patch(rect)
-                        
-                        # Text
-                        orient = "R" if rotated else "O"
-                        ax.text(x + w/2, y + h/2, f"{w}×{h}\n{orient}",
-                              ha='center', va='center', fontsize=8, fontweight='bold')
-                    
-                    ax.invert_yaxis()
-                    ax.grid(True, alpha=0.3)
-                    ax.set_title(f"Board {i+1} - {board['efficiency']:.1f}%", fontweight='bold')
-                    st.pyplot(fig)
-                    plt.close(fig)
-                    
-                    # Piece list
-                    st.write("Pieces in this board:")
-                    for j, (x, y, w, h, rotated) in enumerate(board['pieces'], 1):
-                        orient = "Rotated" if rotated else "Original"
-                        st.write(f"{j}. {w}×{h} mm ({orient}) - Position: [{x}, {y}]")
-            
-            # Generate PDF
-            pdf_buf = io.BytesIO()
-            c = canvas.Canvas(pdf_buf, pagesize=landscape(A4))
-            scale = min((A4[0] - 80 * mm) / board_width, (A4[1] - 80 * mm) / board_height)
-            
-            for i, board in enumerate(boards):
-                c.setFont("Helvetica-Bold", 16)
-                c.drawString(40 * mm, A4[1] - 30 * mm, f"{order_no} - Board {i+1}")
-                c.setFont("Helvetica", 10)
-                c.drawString(40 * mm, A4[1] - 45 * mm, f"Type: {board['type']} | Efficiency: {board['efficiency']:.1f}%")
-                
-                # Draw pieces
-                for (x, y, w, h, rotated) in board['pieces']:
-                    sx = 40 * mm + x * scale
-                    sy = 40 * mm + y * scale
-                    sw = w * scale
-                    sh = h * scale
-                    c.rect(sx, sy, sw, sh)
-                    c.setFont("Helvetica-Bold", 6)
-                    c.drawCentredString(sx + sw/2, sy + sh/2, f"{w}×{h}")
-                
-                c.showPage()
-            
-            c.save()
-            pdf_buf.seek(0)
-            
-            # Download button
-            st.download_button(
-                label="📥 Download PDF Report",
-                data=pdf_buf,
-                file_name=f"{order_no}_cutting_plan.pdf",
-                mime="application/pdf"
-            )
+        with st.spinner("Kuriamas optimalus ruošinių išdėstymas..."):
+            packer = OptimalPacker(kortos_ilgis, kortos_plotis)
+            boards = packer.pack_all_pieces(pieces)
 
-# Instructions
-with st.expander("📱 How to use"):
-    st.write("""
-    1. **Select board type** from dropdown
-    2. **Add pieces** using number pad:
-       - Format: `width height quantity`
-       - Example: `1200 800 5` for five 1200×800 pieces
-       - Example: `600 400` for one 600×400 piece
-    3. **Generate layout** to see optimization
-    4. **Download PDF** for cutting instructions
-    
-    **Optimization features:**
-    - 1200×800 pieces automatically packed optimally (3 vertical + 2 horizontal)
-    - Other pieces packed efficiently
-    - Mobile-optimized interface
-    """)
+        st.subheader("📊 OPTIMALUS RUOŠINIŲ IŠDĖSTYMAS")
+
+        total_pieces = sum(len(b['pieces']) for b in boards)
+        total_used_area = sum(sum(w * h for _, _, w, h, _ in b['pieces']) for b in boards)
+        total_area = kortos_ilgis * kortos_plotis * len(boards)
+        overall_efficiency = total_used_area / total_area * 100
+
+        for i, board_data in enumerate(boards, 1):
+            st.write(f"### 📄 Korta {i} ({board_data['type']}) – {board_data['efficiency']:.1f}%")
+            fig = draw_optimal_board(board_data, kortos_ilgis, kortos_plotis, f"Korta {i}")
+            st.pyplot(fig)
+            plt.close(fig)
+
+        st.success(f"🎉 **Baigta! Bendra išeiga: {overall_efficiency:.1f}%**")
+        pdf_buf = generate_optimal_pdf(boards, kortos_ilgis, kortos_plotis, uzsakymo_nr, plokstes_tipas)
+        st.download_button("📥 Atsisiųsti PDF", pdf_buf, f"{uzsakymo_nr}_planas.pdf", "application/pdf")
+
+# ======================
+# ℹ️ ŠONINĖ INFO
+# ======================
+st.sidebar.header("📊 Statistika")
+if pieces:
+    piece_counts = Counter(pieces)
+    for (w, h), count in piece_counts.items():
+        st.sidebar.write(f"{w}×{h}: {count} vnt.")
