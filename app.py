@@ -18,10 +18,6 @@ st.markdown("""
         font-size: 20px !important;
         text-align: center;
     }
-    .stSelectbox > div > div > select {
-        font-size: 20px !important;
-        text-align: center;
-    }
     .stButton > button {
         width: 100%;
         height: 60px;
@@ -32,20 +28,20 @@ st.markdown("""
     }
     .stTextArea textarea {
         font-size: 18px !important;
-        height: 150px !important;
     }
-    .number-button {
-        width: 80px;
-        height: 80px;
-        font-size: 24px;
-        margin: 5px;
-        background-color: #f0f2f6;
-        border-radius: 10px;
-    }
-    .number-button:hover {
-        background-color: #d0d2d6;
+    .stSelectbox > div > div > select {
+        font-size: 20px !important;
+        text-align: center;
     }
 </style>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const textarea = document.querySelector('textarea');
+        if (textarea) {
+            textarea.setAttribute('inputmode', 'numeric');
+        }
+    });
+</script>
 """, unsafe_allow_html=True)
 
 # ======================
@@ -59,75 +55,40 @@ st.write("Automatinis ruošinių išdėstymas pagal optimalius layout'us")
 # ======================
 col1, col2 = st.columns(2)
 with col1:
-    uzsakymo_nr = st.text_input("Užsakymo numeris:", value="UZS001", key="order_number")
+    uzsakymo_nr = st.text_input("Užsakymo numeris:", "UZS001")
 with col2:
-    plokstes_tipas = st.selectbox(
-        "Plokštės tipas:",
-        ["MDF", "LDF", "HDF", "PPD", "Fanera", "OSB", "Kita"],
-        index=0,
-        key="board_type"
-    )
+    plokstes_tipai = ["MDF", "LDF", "HDF", "DTD", "MPP", "Fanera", "Kita"]
+    plokstes_tipas = st.selectbox("Plokštės tipas:", plokstes_tipai, index=0)
+    if plokstes_tipas == "Kita":
+        plokstes_tipas = st.text_input("Įveskite kitą plokštės tipą:", "")
 
 st.write("### Greiti plokštės šablonai:")
 kortos_variantas = st.radio(
     "Pasirink kortos dydį:",
     ["2800x2070 (standartinė)", "3050x1830 (didelė)", "custom"],
-    index=0,
     horizontal=True,
-    key="board_size_choice"
+    index=0
 )
 
 if kortos_variantas == "custom":
-    kortos_matmenys = st.text_input("Įvesk kortos matmenis:", value="2800x2070", key="custom_board_size")
+    kortos_matmenys = st.text_input("Įvesk kortos matmenis:", "2800x2070")
 else:
     kortos_matmenys = kortos_variantas.split(" ")[0]
 
 try:
-    kortos_ilgis, kortos_plotis = [int(x) for x in kortos_matmenys.lower().split("x")]
+    kortos_ilgis, kortos_plotis = [int(x) for x in kortos_matmenys.lower().replace(" ", "x").split("x")]
 except:
-    st.error("❌ Įvesk formatu: 2800x2070")
+    st.error("❌ Įvesk formatu: 2800x2070 arba 2800 2070")
     st.stop()
 
 st.write("### Įvesk ruošinius:")
-st.write("Formatas: plotis aukštis [kiekis] (pvz., 1200 800 5 arba 1200x800x5)")
-
-# Tuščias ruošinių įvesties laukas
-if "pieces_input" not in st.session_state:
-    st.session_state.pieces_input = ""
-
+st.markdown("**Pastaba**: Vietoje 'x' galite naudoti tarpą, pvz., `1200 800 5` arba `1200x800x5`")
 raw_input = st.text_area(
-    "Vienoje eilutėje – vienas ruošinys:",
-    value=st.session_state.pieces_input,
-    height=150,
-    key="pieces_input_area"
+    "Vienoje eilutėje – vienas ruošinys (pvz. 1200 800 5):",
+    "",
+    height=200,
+    placeholder="Įveskite ruošinius, pvz., 1200 800 5\n504 769\n1030 290"
 )
-
-# Skaičių klaviatūra
-st.write("#### Skaičių klaviatūra:")
-col_nums = st.columns([1, 1, 1, 1])
-buttons = [
-    ["7", "8", "9", " "],
-    ["4", "5", "6", "x"],
-    ["1", "2", "3", "←"],
-    ["0", ".", "Enter", "Clear"]
-]
-
-for row in buttons:
-    with st.container():
-        cols = st.columns(4)
-        for i, btn in enumerate(row):
-            with cols[i]:
-                if st.button(btn, key=f"num_{btn}", help=btn):
-                    current_input = st.session_state.pieces_input
-                    if btn == "←":
-                        st.session_state.pieces_input = current_input[:-1]
-                    elif btn == "Clear":
-                        st.session_state.pieces_input = ""
-                    elif btn == "Enter":
-                        st.session_state.pieces_input = current_input + "\n"
-                    else:
-                        st.session_state.pieces_input = current_input + btn
-                    st.rerun()
 
 # ======================
 # 🔍 PARSINGAS
@@ -135,11 +96,11 @@ for row in buttons:
 def parse_pieces(text):
     pieces = []
     for line in text.strip().splitlines():
-        if not line.strip():
+        # Pakeičiame tarpus į 'x' vienodam formatui
+        line = line.replace(" ", "x")
+        if "x" not in line:
             continue
-        # Pakeičiame tarpus į 'x' ir padalijame
-        line = line.replace(" ", "x").strip()
-        parts = line.split("x")
+        parts = line.strip().split("x")
         try:
             if len(parts) == 3:
                 w, h, qty = map(int, parts)
@@ -325,9 +286,7 @@ def draw_optimal_board(board_data, width, height, title):
         color = colors[i % len(colors)]
         rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='darkblue', facecolor=color, alpha=0.8)
         ax.add_patch(rect)
-        text = f"{w}×{h}"
-        if rotated:
-            text += " R"
+        text = f"{w}×{h}{' R' if rotated else ''}"
         ax.text(x + w / 2, y + h / 2, text, ha='center', va='center', fontsize=8, fontweight='bold')
 
     ax.grid(True, alpha=0.3)
@@ -376,9 +335,7 @@ def generate_optimal_pdf(boards, width, height, uzsakymo_nr, plokstes_tipas):
             
             c.setFillColorRGB(0, 0, 0)
             c.setFont("Helvetica-Bold", 6)
-            text = f"{w}×{h}"
-            if rotated:
-                text += " R"
+            text = f"{w}×{h}{' R' if rotated else ''}"
             c.drawCentredString(sx + sw / 2, sy + sh / 2, text)
         
         c.setFillColorRGB(0, 0, 0, 0)
@@ -438,13 +395,3 @@ if pieces:
     st.sidebar.write(f"**Viso ruošinių:** {len(pieces)}")
     for (w, h), count in piece_counts.items():
         st.sidebar.write(f"{w}×{h}: {count} vnt.")
-
-st.sidebar.header("ℹ️ Naudojimo instrukcija")
-st.sidebar.markdown("""
-1. Įveskite užsakymo numerį
-2. Pasirinkite plokštės tipą
-3. Pasirinkite kortos dydį arba įveskite savo
-4. Įveskite ruošinius (pvz., 1200 800 5)
-5. Naudokite skaičių klaviatūrą
-6. Spustelėkite „Generuoti“
-""")
